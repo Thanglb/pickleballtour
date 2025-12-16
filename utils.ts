@@ -17,6 +17,8 @@ export const TRANSLATIONS = {
     maxPlayers: "Số VĐV tối đa/bảng",
     playerReg: "Đăng ký vận động viên",
     autoFill: "Tự động điền 16 VĐV",
+    importExcel: "Nhập từ Excel",
+    downloadTemplate: "Tải file mẫu",
     add: "Thêm",
     name: "Tên",
     rank: "Hạng",
@@ -56,6 +58,7 @@ export const TRANSLATIONS = {
     referee: "Trọng tài",
     signature: "Ký tên",
     winner: "Người thắng",
+    excelError: "Lỗi đọc file. Vui lòng kiểm tra định dạng.",
   },
   en: {
     appTitle: "Pickleball Tournament Pro",
@@ -72,6 +75,8 @@ export const TRANSLATIONS = {
     maxPlayers: "Max Players/Group",
     playerReg: "Player Registration",
     autoFill: "Auto-fill 16 Players",
+    importExcel: "Import Excel",
+    downloadTemplate: "Download Template",
     add: "Add",
     name: "Name",
     rank: "Rank",
@@ -111,6 +116,7 @@ export const TRANSLATIONS = {
     referee: "Referee",
     signature: "Signature",
     winner: "Winner",
+    excelError: "Error reading file. Please check the format.",
   }
 };
 

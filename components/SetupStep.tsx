@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Player, Rank, TournamentConfig, Language } from '../types';
 import { generatePlayerId, t } from '../utils';
-import { Plus, Trash2, Users } from 'lucide-react';
+import { Plus, Trash2, Users, Upload, FileDown } from 'lucide-react';
+import { read, utils } from 'xlsx';
 
 interface Props {
   config: TournamentConfig;
@@ -16,6 +17,7 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerRank, setNewPlayerRank] = useState<Rank>(Rank.A);
   const [excludeIds, setExcludeIds] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addPlayer = () => {
     if (!newPlayerName.trim()) return;
@@ -59,6 +61,78 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
       }
       setPlayers(dummies);
   }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = read(data);
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData: any[] = utils.sheet_to_json(worksheet);
+
+        const newPlayers: Player[] = [];
+        let currentIndex = players.length;
+
+        const pointMap: Record<string, number> = { 'A+': 4, 'A': 3, 'B+': 2, 'B': 1 };
+
+        jsonData.forEach((row) => {
+            // Support both Vietnamese and English headers
+            const name = row['Tên'] || row['Name'];
+            let rankStr = row['Hạng'] || row['Rank'];
+            const exclusionStr = row['Tránh gặp'] || row['Exclusions'];
+
+            if (name) {
+                // Normalize Rank
+                let rank: Rank = Rank.A;
+                if(rankStr) {
+                    rankStr = rankStr.toString().trim().toUpperCase();
+                    if(rankStr === 'A+') rank = Rank.APlus;
+                    else if(rankStr === 'A') rank = Rank.A;
+                    else if(rankStr === 'B+') rank = Rank.BPlus;
+                    else if(rankStr === 'B') rank = Rank.B;
+                }
+
+                // Process Exclusions
+                const excludeIds = exclusionStr 
+                    ? exclusionStr.toString().split(',').map((s: string) => s.trim().toUpperCase())
+                    : [];
+
+                newPlayers.push({
+                    id: generatePlayerId(currentIndex),
+                    name: name,
+                    rank: rank,
+                    points: pointMap[rank],
+                    excludeIds: excludeIds
+                });
+                currentIndex++;
+            }
+        });
+
+        if (newPlayers.length > 0) {
+            setPlayers([...players, ...newPlayers]);
+        }
+    } catch (error) {
+        console.error("Error parsing Excel:", error);
+        alert(t('excelError', lang));
+    } finally {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+     const headers = [["Tên", "Hạng", "Tránh gặp"], ["Nguyen Van A", "A+", "P02, P05"]];
+     const ws = utils.aoa_to_sheet(headers);
+     const wb = utils.book_new();
+     utils.book_append_sheet(wb, ws, "Template");
+     import("xlsx").then(xlsx => {
+         xlsx.writeFile(wb, "Pickleball_Template.xlsx");
+     });
+  };
 
   return (
     <div className="space-y-6">
@@ -106,11 +180,26 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
             <h2 className="text-xl font-bold text-slate-800">{t('playerReg', lang)} ({players.length})</h2>
-            <button onClick={generateDummyPlayers} className="text-sm text-indigo-600 hover:text-indigo-800 underline">
-                {t('autoFill', lang)}
-            </button>
+            <div className="flex gap-2">
+                 <button onClick={handleDownloadTemplate} className="text-sm text-gray-600 hover:text-gray-900 flex items-center border px-2 py-1 rounded">
+                    <FileDown size={14} className="mr-1" /> Template
+                </button>
+                <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    accept=".xlsx, .xls" 
+                    onChange={handleFileUpload} 
+                    className="hidden"
+                />
+                <button onClick={() => fileInputRef.current?.click()} className="text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1 rounded flex items-center font-medium">
+                    <Upload size={14} className="mr-1" /> {t('importExcel', lang)}
+                </button>
+                <button onClick={generateDummyPlayers} className="text-sm text-indigo-600 hover:text-indigo-800 underline">
+                    {t('autoFill', lang)}
+                </button>
+            </div>
         </div>
         
         <div className="flex flex-col md:flex-row gap-2 mb-4">
@@ -136,9 +225,9 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[400px]">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('name', lang)}</th>
