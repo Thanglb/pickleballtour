@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Player, Rank, TournamentConfig, Language } from '../types';
 import { generatePlayerId, t } from '../utils';
-import { Plus, Trash2, Users, Upload, FileDown } from 'lucide-react';
+import { Plus, Trash2, Users, Upload, FileDown, Pencil, X } from 'lucide-react';
 import { read, utils } from 'xlsx';
 
 interface Props {
@@ -17,48 +17,103 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerRank, setNewPlayerRank] = useState<Rank>(Rank.A);
   const [excludeIds, setExcludeIds] = useState<string>('');
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addPlayer = () => {
+  const addOrUpdatePlayer = () => {
     if (!newPlayerName.trim()) return;
-    const newId = generatePlayerId(players.length);
-    const exclusions = excludeIds.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
-    
-    const newPlayer: Player = {
-      id: newId,
-      name: newPlayerName,
-      rank: newPlayerRank,
-      points: 0, // Calculated in utils based on Rank enum, handled there or mapped here
-      excludeIds: exclusions
-    };
 
-    // Map rank to points immediately for easier sorting later
     const pointMap: Record<string, number> = { 'A+': 4, 'A': 3, 'B+': 2, 'B': 1 };
-    newPlayer.points = pointMap[newPlayerRank];
+    const exclusions = excludeIds.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
 
-    setPlayers([...players, newPlayer]);
+    if (editingPlayerId) {
+        // Update existing player
+        const updatedPlayers = players.map(p => {
+            if (p.id === editingPlayerId) {
+                return {
+                    ...p,
+                    name: newPlayerName,
+                    rank: newPlayerRank,
+                    points: pointMap[newPlayerRank],
+                    excludeIds: exclusions
+                };
+            }
+            return p;
+        });
+        setPlayers(updatedPlayers);
+        setEditingPlayerId(null);
+    } else {
+        // Add new player
+        const newId = generatePlayerId(players.length);
+        const newPlayer: Player = {
+            id: newId,
+            name: newPlayerName,
+            rank: newPlayerRank,
+            points: pointMap[newPlayerRank],
+            excludeIds: exclusions
+        };
+        setPlayers([...players, newPlayer]);
+    }
+
+    // Reset Form
     setNewPlayerName('');
     setExcludeIds('');
+    setNewPlayerRank(Rank.A);
+  };
+
+  const handleEdit = (player: Player) => {
+    setNewPlayerName(player.name);
+    setNewPlayerRank(player.rank);
+    setExcludeIds(player.excludeIds.join(', '));
+    setEditingPlayerId(player.id);
+  };
+
+  const cancelEdit = () => {
+    setNewPlayerName('');
+    setNewPlayerRank(Rank.A);
+    setExcludeIds('');
+    setEditingPlayerId(null);
   };
 
   const removePlayer = (id: string) => {
+    if(editingPlayerId === id) cancelEdit();
     setPlayers(players.filter(p => p.id !== id));
   };
 
   const generateDummyPlayers = () => {
       const dummies: Player[] = [];
-      const ranks = [Rank.APlus, Rank.A, Rank.BPlus, Rank.B];
-      for(let i=0; i<16; i++) {
-          const r = ranks[Math.floor(Math.random() * ranks.length)];
-          const pointMap: Record<string, number> = { 'A+': 4, 'A': 3, 'B+': 2, 'B': 1 };
-          dummies.push({
-              id: generatePlayerId(i),
-              name: `Player ${i+1}`,
-              rank: r,
-              points: pointMap[r],
-              excludeIds: []
-          });
+      const specificPlayers = [
+        { name: "Lê Bảo Thắng", rank: Rank.APlus },
+        { name: "Lê Hoàng Sơn", rank: Rank.APlus },
+        { name: "Nguyễn Mạnh Hà", rank: Rank.A },
+        { name: "Đặng Kiều Hưng", rank: Rank.A },
+        { name: "Vũ Trọng Quý", rank: Rank.APlus },
+        { name: "Lê Đức Mạnh", rank: Rank.A },
+        { name: "Đặng Vĩnh Thiêm", rank: Rank.A },
+        { name: "Vũ Văn Trường", rank: Rank.APlus },
+        { name: "V.T. Lam", rank: Rank.APlus },
+        { name: "Nguyễn Anh Tuấn", rank: Rank.APlus },
+        { name: "Võ Công Văn", rank: Rank.BPlus },
+        { name: "Đặng Thanh Bình", rank: Rank.BPlus }
+      ];
+
+      // Shuffle specificPlayers array randomly
+      for (let i = specificPlayers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [specificPlayers[i], specificPlayers[j]] = [specificPlayers[j], specificPlayers[i]];
       }
+
+      const pointMap: Record<string, number> = { 'A+': 4, 'A': 3, 'B+': 2, 'B': 1 };
+      
+      specificPlayers.forEach((sp, i) => {
+        dummies.push({
+            id: generatePlayerId(i),
+            name: sp.name,
+            rank: sp.rank,
+            points: pointMap[sp.rank],
+            excludeIds: []
+        });
+      });
       setPlayers(dummies);
   }
 
@@ -207,7 +262,7 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
             type="text" placeholder={t('name', lang)} 
             className="flex-1 rounded-md border-gray-300 border p-2"
             value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addPlayer()}
+            onKeyDown={e => e.key === 'Enter' && addOrUpdatePlayer()}
           />
           <select 
             className="rounded-md border-gray-300 border p-2"
@@ -220,9 +275,21 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
             className="flex-1 rounded-md border-gray-300 border p-2"
             value={excludeIds} onChange={e => setExcludeIds(e.target.value)}
           />
-          <button onClick={addPlayer} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center justify-center">
-            <Plus size={18} /> {t('add', lang)}
-          </button>
+          
+          {editingPlayerId ? (
+            <div className="flex space-x-2">
+                <button onClick={addOrUpdatePlayer} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center">
+                   <Pencil size={18} className="mr-1"/> {t('update', lang)}
+                </button>
+                 <button onClick={cancelEdit} className="bg-gray-400 text-white px-3 py-2 rounded-md hover:bg-gray-500 flex items-center justify-center">
+                   <X size={18} />
+                </button>
+            </div>
+          ) : (
+            <button onClick={addOrUpdatePlayer} className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center justify-center">
+                <Plus size={18} /> {t('add', lang)}
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto max-h-[400px]">
@@ -238,7 +305,7 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {players.map(p => (
-                <tr key={p.id}>
+                <tr key={p.id} className={editingPlayerId === p.id ? 'bg-blue-50' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -251,9 +318,14 @@ const SetupStep: React.FC<Props> = ({ config, players, lang, setConfig, setPlaye
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{p.excludeIds.join(', ')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => removePlayer(p.id)} className="text-red-600 hover:text-red-900">
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex justify-end space-x-3">
+                         <button onClick={() => handleEdit(p)} className="text-blue-600 hover:text-blue-900">
+                             <Pencil size={16} />
+                         </button>
+                        <button onClick={() => removePlayer(p.id)} className="text-red-600 hover:text-red-900">
+                             <Trash2 size={16} />
+                        </button>
+                    </div>
                   </td>
                 </tr>
               ))}

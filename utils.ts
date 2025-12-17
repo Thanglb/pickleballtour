@@ -16,10 +16,13 @@ export const TRANSLATIONS = {
     elimRounds: "Số vòng đấu trực tiếp",
     maxPlayers: "Số VĐV tối đa/bảng",
     playerReg: "Đăng ký vận động viên",
-    autoFill: "Tự động điền 16 VĐV",
+    autoFill: "Điền danh sách mẫu (12 VĐV)",
     importExcel: "Nhập từ Excel",
     downloadTemplate: "Tải file mẫu",
     add: "Thêm",
+    update: "Cập nhật",
+    edit: "Sửa",
+    cancel: "Hủy",
     name: "Tên",
     rank: "Hạng",
     exclusions: "Tránh gặp",
@@ -39,7 +42,7 @@ export const TRANSLATIONS = {
     save: "Lưu",
     groupStandings: "Bảng xếp hạng",
     rk: "Hạng",
-    team: "Đội",
+    team: "Đội / VĐV",
     mp: "Trận",
     w: "Thắng",
     l: "Thua",
@@ -59,6 +62,10 @@ export const TRANSLATIONS = {
     signature: "Ký tên",
     winner: "Người thắng",
     excelError: "Lỗi đọc file. Vui lòng kiểm tra định dạng.",
+    pointsFor: "Điểm thắng (GF)",
+    pointsAgainst: "Điểm thua (GA)",
+    pairStandings: "Xếp Hạng Cặp Đôi",
+    individualStandings: "Xếp Hạng Cá Nhân",
   },
   en: {
     appTitle: "Pickleball Tournament Pro",
@@ -74,10 +81,13 @@ export const TRANSLATIONS = {
     elimRounds: "Elimination Rounds",
     maxPlayers: "Max Players/Group",
     playerReg: "Player Registration",
-    autoFill: "Auto-fill 16 Players",
+    autoFill: "Auto-fill Sample (12 Players)",
     importExcel: "Import Excel",
     downloadTemplate: "Download Template",
     add: "Add",
+    update: "Update",
+    edit: "Edit",
+    cancel: "Cancel",
     name: "Name",
     rank: "Rank",
     exclusions: "Exclusions",
@@ -97,7 +107,7 @@ export const TRANSLATIONS = {
     save: "Save",
     groupStandings: "Group Standings",
     rk: "Rk",
-    team: "Team",
+    team: "Team / Player",
     mp: "MP",
     w: "W",
     l: "L",
@@ -117,6 +127,10 @@ export const TRANSLATIONS = {
     signature: "Signature",
     winner: "Winner",
     excelError: "Error reading file. Please check the format.",
+    pointsFor: "Pts For (GF)",
+    pointsAgainst: "Pts Against (GA)",
+    pairStandings: "Pair Standings",
+    individualStandings: "Individual Standings",
   }
 };
 
@@ -135,8 +149,19 @@ export const getRankPoints = (rank: Rank) => RANK_POINTS[rank];
 // --- Pairing Logic ---
 
 export const generatePairs = (players: Player[], numGroups: number): { pairs: Pair[], groups: Group[] } => {
-  // Deep copy to avoid mutating state directly during calculation
-  let pool = [...players].sort((a, b) => b.points - a.points); // Sort by Rank High to Low
+  // 1. Randomize the player pool completely first.
+  // This ensures that if multiple players have the same rank, their order is random,
+  // preventing deterministic pairing based on input order.
+  let pool = [...players];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  // 2. Sort by Rank High to Low.
+  // Since sort is stable, the random relative order of players with *equal* points is preserved.
+  pool.sort((a, b) => b.points - a.points);
+  
   const pairs: Pair[] = [];
   const groups: Group[] = [];
 
@@ -149,8 +174,7 @@ export const generatePairs = (players: Player[], numGroups: number): { pairs: Pa
     });
   }
 
-  // Pairing Algorithm: Try to balance total points
-  // Simple greedy approach: Take highest available, match with lowest available compatible
+  // Pairing Algorithm: Balance total points (Strongest with Weakest)
   let pairIndex = 1;
 
   while (pool.length >= 2) {
@@ -186,6 +210,11 @@ export const generatePairs = (players: Player[], numGroups: number): { pairs: Pa
 
   // Assign Pairs to Groups (Snake draft to balance group strength)
   // Sort pairs by total points first
+  // Shuffle equal point pairs too to randomize group assignment for ties
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+  }
   pairs.sort((a, b) => b.totalRankPoints - a.totalRankPoints);
 
   pairs.forEach((pair, index) => {
@@ -545,11 +574,100 @@ export const calculateStandings = (matches: Match[], pairs: Pair[]): Record<stri
             p1Stats.losses++;
         }
     });
-
-    // Determine Ranks (Per group)
-    // We need to group them by Group ID to rank correctly within group
-    // But since this returns a flat list, we assign rank based on sort. 
-    // The UI handles filtering by group.
     
     return table;
 }
+
+export const calculatePlayerStandings = (matches: Match[], pairs: Pair[]): Record<string, StandingsRow> => {
+    const table: Record<string, StandingsRow> = {};
+    const playerMap: Record<string, Player> = {};
+
+    // Map Players from Pairs
+    pairs.forEach(p => {
+        playerMap[p.player1.id] = p.player1;
+        playerMap[p.player2.id] = p.player2;
+    });
+
+    // Initialize table for all unique players
+    Object.values(playerMap).forEach(player => {
+        table[player.id] = {
+            pairId: player.id, // Reusing field for PlayerID
+            pairName: player.name,
+            matchesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            pointsFor: 0,
+            pointsAgainst: 0,
+            diff: 0,
+            rank: 0
+        };
+    });
+
+    matches.filter(m => !m.isElimination && m.finished).forEach(m => {
+        const pair1 = pairs.find(p => p.id === m.pair1Id);
+        const pair2 = pairs.find(p => p.id === m.pair2Id);
+        if(!pair1 || !pair2) return;
+
+        const p1a = table[pair1.player1.id];
+        const p1b = table[pair1.player2.id];
+        const p2a = table[pair2.player1.id];
+        const p2b = table[pair2.player2.id];
+
+        const s1 = m.score.pair1Score || 0;
+        const s2 = m.score.pair2Score || 0;
+
+        // Update Stats for Pair 1 Players
+        [p1a, p1b].forEach(p => {
+            if(p) {
+                p.matchesPlayed++;
+                p.pointsFor += s1;
+                p.pointsAgainst += s2;
+                p.diff = p.pointsFor - p.pointsAgainst;
+                if(s1 > s2) p.wins++; else p.losses++;
+            }
+        });
+
+        // Update Stats for Pair 2 Players
+        [p2a, p2b].forEach(p => {
+             if(p) {
+                p.matchesPlayed++;
+                p.pointsFor += s2;
+                p.pointsAgainst += s1;
+                p.diff = p.pointsFor - p.pointsAgainst;
+                if(s2 > s1) p.wins++; else p.losses++;
+             }
+        });
+    });
+
+    return table;
+};
+
+// Helper to sort standings based on rules: Total Points (Wins) -> Head-to-Head -> Diff -> Points For
+export const sortStandings = (standings: StandingsRow[], matches: Match[], isPair: boolean): StandingsRow[] => {
+    return standings.sort((a, b) => {
+        // 1. Total Points (Wins)
+        if (a.wins !== b.wins) return b.wins - a.wins;
+
+        // 2. Head to Head (Only feasible robustly for Pairs in this simple model)
+        // Check if there is a direct match between these two entities
+        if (isPair) {
+            const directMatch = matches.find(m => 
+                m.finished && !m.isElimination &&
+                ((m.pair1Id === a.pairId && m.pair2Id === b.pairId) || 
+                 (m.pair1Id === b.pairId && m.pair2Id === a.pairId))
+            );
+
+            if (directMatch) {
+                // If A beat B, A comes first (return -1)
+                if (directMatch.winnerId === a.pairId) return -1;
+                if (directMatch.winnerId === b.pairId) return 1;
+            }
+        }
+
+        // 3. Point Difference
+        if (a.diff !== b.diff) return b.diff - a.diff;
+
+        // 4. Points For
+        return b.pointsFor - a.pointsFor;
+    });
+};

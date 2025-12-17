@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, Pair, Group, Language } from '../types';
-import { Save } from 'lucide-react';
+import { Save, Edit2 } from 'lucide-react';
 import { t } from '../utils';
 
 interface Props {
@@ -62,7 +62,7 @@ const ScheduleView: React.FC<Props> = ({ matches, pairs, groups, config, lang, o
                 {t('slot', lang)}
               </th>
               {Array.from({ length: config.numCourts }).map((_, i) => (
-                <th key={i} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
+                <th key={i} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[260px]">
                   {t('court', lang)} {i + 1}
                 </th>
               ))}
@@ -106,10 +106,16 @@ const ScheduleView: React.FC<Props> = ({ matches, pairs, groups, config, lang, o
 const MatchCard: React.FC<{ match: Match, pairs: Pair[], lang: Language, onUpdateScore: (id: string, s1: number, s2: number) => void }> = ({ match, pairs, lang, onUpdateScore }) => {
   const [s1, setS1] = useState(match.score.pair1Score?.toString() || '');
   const [s2, setS2] = useState(match.score.pair2Score?.toString() || '');
+  
+  // Update local state if match score changes externally (though rare in this flow)
+  React.useEffect(() => {
+     if (match.score.pair1Score !== null) setS1(match.score.pair1Score.toString());
+     if (match.score.pair2Score !== null) setS2(match.score.pair2Score.toString());
+  }, [match.score]);
 
   const getLabel = (id: string, fallback?: string) => {
       const p = pairs.find(x => x.id === id);
-      if(p) return `${p.player1.name}/${p.player2.name}`;
+      if(p) return `${p.player1.name} & ${p.player2.name}`;
       return fallback || 'TBD';
   }
 
@@ -125,31 +131,41 @@ const MatchCard: React.FC<{ match: Match, pairs: Pair[], lang: Language, onUpdat
   const borderColor = match.isElimination ? 'border-orange-300 bg-orange-50' : isCompleted ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white';
 
   return (
-    <div className={`p-2 rounded-md border shadow-sm ${borderColor} text-sm`}>
-      <div className="flex justify-between items-center mb-1">
+    <div className={`p-3 rounded-md border shadow-sm ${borderColor} text-sm h-full flex flex-col justify-between`}>
+      <div className="flex justify-between items-center mb-2 border-b border-black/5 pb-1">
         <span className="text-xs font-bold text-gray-500">{match.id}</span>
         <span className="text-[10px] uppercase text-gray-400">{match.roundName}</span>
       </div>
       
-      <div className="flex justify-between items-center mb-1">
-        <div className="truncate w-24 mr-1 text-xs" title={getLabel(match.pair1Id, match.pair1Name)}>{getLabel(match.pair1Id, match.pair1Name)}</div>
-        <input 
-          type="number" className={`w-8 h-6 text-center border rounded ${isCompleted ? 'bg-gray-100 font-bold' : 'bg-white'}`}
-          value={s1} onChange={e => setS1(e.target.value)} 
-        />
-      </div>
-      
-      <div className="flex justify-between items-center mb-2">
-        <div className="truncate w-24 mr-1 text-xs" title={getLabel(match.pair2Id, match.pair2Name)}>{getLabel(match.pair2Id, match.pair2Name)}</div>
-        <input 
-          type="number" className={`w-8 h-6 text-center border rounded ${isCompleted ? 'bg-gray-100 font-bold' : 'bg-white'}`}
-          value={s2} onChange={e => setS2(e.target.value)} 
-        />
+      <div className="space-y-3 mb-2">
+        <div className="flex justify-between items-center gap-2">
+            <div className="text-xs font-medium text-slate-800 leading-tight flex-1" title={getLabel(match.pair1Id, match.pair1Name)}>
+                {getLabel(match.pair1Id, match.pair1Name)}
+            </div>
+            <input 
+            type="number" className="w-10 h-8 text-center border rounded flex-shrink-0 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            value={s1} onChange={e => setS1(e.target.value)} 
+            />
+        </div>
+        
+        <div className="flex justify-between items-center gap-2">
+            <div className="text-xs font-medium text-slate-800 leading-tight flex-1" title={getLabel(match.pair2Id, match.pair2Name)}>
+                {getLabel(match.pair2Id, match.pair2Name)}
+            </div>
+            <input 
+            type="number" className="w-10 h-8 text-center border rounded flex-shrink-0 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            value={s2} onChange={e => setS2(e.target.value)} 
+            />
+        </div>
       </div>
 
-      {!isCompleted && match.pair1Id !== 'TBD' && match.pair2Id !== 'TBD' && (
-         <button onClick={handleSave} className="w-full text-xs bg-indigo-600 text-white py-1 rounded hover:bg-indigo-700 flex justify-center items-center">
-             <Save size={12} className="mr-1"/> {t('save', lang)}
+      {match.pair1Id !== 'TBD' && match.pair2Id !== 'TBD' && (
+         <button 
+            onClick={handleSave} 
+            className={`w-full text-xs py-1.5 rounded flex justify-center items-center mt-2 transition-colors
+                ${isCompleted ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+         >
+             {isCompleted ? <><Edit2 size={14} className="mr-1"/> {t('update', lang)}</> : <><Save size={14} className="mr-1"/> {t('save', lang)}</>}
          </button>
       )}
     </div>

@@ -6,7 +6,7 @@ import PairingStep from './components/PairingStep';
 import ScheduleView from './components/ScheduleView';
 import StandingsView from './components/StandingsView';
 import PrintReports from './components/PrintReports';
-import { Calendar, Trophy, Users, LayoutList, Printer, Globe, X } from 'lucide-react';
+import { Calendar, Trophy, Users, LayoutList, Printer, Globe, X, Settings, ListTree } from 'lucide-react';
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('vi'); // Default Vietnamese
@@ -17,10 +17,10 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     step: 'setup',
     config: {
-      numCourts: 3,
-      numGroups: 2,
-      maxPlayersPerGroup: 8,
-      eliminationRounds: 2 // default to Semis+Final
+      numCourts: 2,
+      numGroups: 1,
+      maxPlayersPerGroup: 12,
+      eliminationRounds: 0 // Default 0
     },
     players: [],
     pairs: [],
@@ -123,6 +123,19 @@ const App: React.FC = () => {
     setLang(prev => prev === 'vi' ? 'en' : 'vi');
   };
 
+  const handleStepClick = (step: 'setup' | 'pairing' | 'schedule') => {
+      // Logic to prevent skipping steps forward without data, but allow moving back
+      if (step === 'pairing' && state.pairs.length === 0) {
+          // Can't go to pairing if no pairs
+          return; 
+      }
+      if (step === 'schedule' && state.matches.length === 0) {
+          // Can't go to schedule if no matches
+          return;
+      }
+      setState(prev => ({ ...prev, step }));
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-slate-900 pb-20 print:bg-white print:pb-0">
       {/* Header */}
@@ -156,6 +169,37 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
+      
+      {/* Stepper Navigation */}
+      <div className="bg-white border-b border-gray-200 print:hidden">
+         <div className="max-w-7xl mx-auto flex">
+            <button 
+                onClick={() => handleStepClick('setup')}
+                className={`flex-1 py-4 text-center text-sm font-medium border-b-2 hover:bg-gray-50 flex justify-center items-center
+                ${state.step === 'setup' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}
+            >
+                <Settings size={18} className="mr-2"/> {t('setup', lang)}
+            </button>
+             <button 
+                onClick={() => handleStepClick('pairing')}
+                disabled={state.pairs.length === 0}
+                className={`flex-1 py-4 text-center text-sm font-medium border-b-2 hover:bg-gray-50 flex justify-center items-center
+                ${state.step === 'pairing' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}
+                ${state.pairs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <ListTree size={18} className="mr-2"/> {t('pairing', lang)}
+            </button>
+             <button 
+                onClick={() => handleStepClick('schedule')}
+                disabled={state.matches.length === 0}
+                className={`flex-1 py-4 text-center text-sm font-medium border-b-2 hover:bg-gray-50 flex justify-center items-center
+                ${state.step === 'schedule' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}
+                ${state.matches.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <Calendar size={18} className="mr-2"/> {t('schedule', lang)}
+            </button>
+         </div>
+      </div>
 
       {/* Main UI - Hidden when printing */}
       <main className="max-w-7xl mx-auto p-4 md:p-6 print:hidden">
@@ -183,7 +227,7 @@ const App: React.FC = () => {
         {state.step === 'schedule' && (
           <div className="space-y-6">
             
-            {/* Tabs */}
+            {/* Tabs for Schedule View */}
             <div className="flex space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm w-fit mx-auto mb-6">
                 <button 
                   onClick={() => setActiveTab('schedule')}
