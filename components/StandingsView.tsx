@@ -81,17 +81,15 @@ const StandingsView: React.FC<Props> = ({ groups, pairs, matches, lang }) => {
         return <div key={group.id}>{renderTable(sortedRows, `${group.name} - ${t('pairStandings', lang)}`, true)}</div>
       })}
 
-      {viewMode === 'individual' && groups.map(group => {
-         // Filter players belonging to this group
-         const groupPairs = pairs.filter(p => p.groupId === group.id);
-         const playerIds = new Set<string>();
-         groupPairs.forEach(p => { playerIds.add(p.player1.id); playerIds.add(p.player2.id); });
-
-         const rawRows = Object.values(playerStandings).filter(row => playerIds.has(row.pairId));
-         const sortedRows = sortStandings(rawRows, matches, false);
-         
-         return <div key={group.id}>{renderTable(sortedRows, `${group.name} - ${t('individualStandings', lang)}`, false)}</div>
-      })}
+      {viewMode === 'individual' && (
+         <div className="space-y-4">
+             {(() => {
+                 const allRows = Object.values(playerStandings);
+                 const sortedRows = sortStandings(allRows, matches, false);
+                 return renderTable(sortedRows, `${t('individualStandings', lang)} - ${t('allPlayers', lang)}`, false);
+             })()}
+         </div>
+      )}
     </div>
   );
 };

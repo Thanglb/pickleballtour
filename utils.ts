@@ -66,6 +66,7 @@ export const TRANSLATIONS = {
     pointsAgainst: "Điểm thua (GA)",
     pairStandings: "Xếp Hạng Cặp Đôi",
     individualStandings: "Xếp Hạng Cá Nhân",
+    allPlayers: "Tất cả Vận động viên",
   },
   en: {
     appTitle: "Pickleball Tournament Pro",
@@ -131,6 +132,7 @@ export const TRANSLATIONS = {
     pointsAgainst: "Pts Against (GA)",
     pairStandings: "Pair Standings",
     individualStandings: "Individual Standings",
+    allPlayers: "All Players",
   }
 };
 
@@ -548,8 +550,9 @@ export const calculateStandings = (matches: Match[], pairs: Pair[]): Record<stri
         };
     });
 
-    // Process Matches (Only Group Stage)
-    matches.filter(m => !m.isElimination && m.finished).forEach(m => {
+    // Process Matches (Include both Group and Elimination if finished)
+    // Updated: removed !m.isElimination check to include playoffs in stats if desired
+    matches.filter(m => m.finished).forEach(m => {
         if (!table[m.pair1Id] || !table[m.pair2Id]) return;
 
         const p1Stats = table[m.pair1Id];
@@ -603,7 +606,8 @@ export const calculatePlayerStandings = (matches: Match[], pairs: Pair[]): Recor
         };
     });
 
-    matches.filter(m => !m.isElimination && m.finished).forEach(m => {
+    // UPDATED: Filter now includes elimination matches
+    matches.filter(m => m.finished).forEach(m => {
         const pair1 = pairs.find(p => p.id === m.pair1Id);
         const pair2 = pairs.find(p => p.id === m.pair2Id);
         if(!pair1 || !pair2) return;
@@ -652,7 +656,7 @@ export const sortStandings = (standings: StandingsRow[], matches: Match[], isPai
         // Check if there is a direct match between these two entities
         if (isPair) {
             const directMatch = matches.find(m => 
-                m.finished && !m.isElimination &&
+                m.finished &&
                 ((m.pair1Id === a.pairId && m.pair2Id === b.pairId) || 
                  (m.pair1Id === b.pairId && m.pair2Id === a.pairId))
             );
