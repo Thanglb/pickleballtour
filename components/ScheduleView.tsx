@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Match, Pair, Group, Language } from '../types';
-import { Save, Edit2 } from 'lucide-react';
+import { Save, Edit2, Trophy } from 'lucide-react';
 import { t } from '../utils';
 
 interface Props {
@@ -58,11 +58,11 @@ const ScheduleView: React.FC<Props> = ({ matches, pairs, groups, config, lang, o
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 w-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
                 {t('slot', lang)}
               </th>
               {Array.from({ length: config.numCourts }).map((_, i) => (
-                <th key={i} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[260px]">
+                <th key={i} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[280px]">
                   {t('court', lang)} {i + 1}
                 </th>
               ))}
@@ -71,7 +71,7 @@ const ScheduleView: React.FC<Props> = ({ matches, pairs, groups, config, lang, o
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredSlots.map(slot => (
               <tr key={slot}>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-100">
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-100 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
                   #{slot}
                 </td>
                 {Array.from({ length: config.numCourts }).map((_, i) => {
@@ -80,13 +80,13 @@ const ScheduleView: React.FC<Props> = ({ matches, pairs, groups, config, lang, o
                   const isVisible = match && (selectedGroup === 'all' || match.groupId === selectedGroup || (selectedGroup === 'elim' && match.isElimination));
 
                   return (
-                    <td key={i} className="px-2 py-2 align-top border-l border-gray-100 bg-gray-50/30">
+                    <td key={i} className="px-3 py-3 align-top border-l border-gray-100 bg-gray-50/30">
                       {match && isVisible ? (
                         <MatchCard match={match} pairs={pairs} lang={lang} onUpdateScore={onUpdateScore} />
                       ) : match ? (
-                         <div className="text-xs text-gray-300 text-center py-4">{t('filter', lang)}</div>
+                         <div className="text-xs text-gray-300 text-center py-4 opacity-50">{t('filter', lang)}</div>
                       ) : (
-                        <div className="text-xs text-gray-300 text-center py-4">- {t('free', lang)} -</div>
+                        <div className="text-xs text-gray-300 text-center py-4 border-2 border-dashed border-gray-100 rounded-lg mx-2">- {t('free', lang)} -</div>
                       )}
                     </td>
                   );
@@ -107,7 +107,6 @@ const MatchCard: React.FC<{ match: Match, pairs: Pair[], lang: Language, onUpdat
   const [s1, setS1] = useState(match.score.pair1Score?.toString() || '');
   const [s2, setS2] = useState(match.score.pair2Score?.toString() || '');
   
-  // Update local state if match score changes externally (though rare in this flow)
   React.useEffect(() => {
      if (match.score.pair1Score !== null) setS1(match.score.pair1Score.toString());
      if (match.score.pair2Score !== null) setS2(match.score.pair2Score.toString());
@@ -128,45 +127,77 @@ const MatchCard: React.FC<{ match: Match, pairs: Pair[], lang: Language, onUpdat
   };
 
   const isCompleted = match.finished;
-  const borderColor = match.isElimination ? 'border-orange-300 bg-orange-50' : isCompleted ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white';
+  
+  // Style calculations
+  const isP1Winner = isCompleted && match.winnerId === match.pair1Id;
+  const isP2Winner = isCompleted && match.winnerId === match.pair2Id;
 
   return (
-    <div className={`p-3 rounded-md border shadow-sm ${borderColor} text-sm h-full flex flex-col justify-between`}>
-      <div className="flex justify-between items-center mb-2 border-b border-black/5 pb-1">
-        <span className="text-xs font-bold text-gray-500">{match.id}</span>
-        <span className="text-[10px] uppercase text-gray-400">{match.roundName}</span>
+    <div className={`rounded-xl border shadow-sm transition-all duration-200 overflow-hidden flex flex-col h-full bg-white
+        ${match.isElimination ? 'border-orange-200' : isCompleted ? 'border-green-200' : 'border-gray-200 hover:shadow-md'}`}>
+      
+      {/* Header */}
+      <div className={`flex justify-between items-center px-3 py-2 border-b text-xs font-semibold
+        ${match.isElimination ? 'bg-orange-50 text-orange-800 border-orange-100' : isCompleted ? 'bg-green-50 text-green-800 border-green-100' : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+        <span className="bg-white/50 px-1.5 py-0.5 rounded border border-black/5">{match.id}</span>
+        <span className="uppercase tracking-wide text-[10px]">{match.roundName}</span>
       </div>
       
-      <div className="space-y-3 mb-2">
-        <div className="flex justify-between items-center gap-2">
-            <div className="text-xs font-medium text-slate-800 leading-tight flex-1" title={getLabel(match.pair1Id, match.pair1Name)}>
-                {getLabel(match.pair1Id, match.pair1Name)}
+      <div className="p-3 space-y-3 flex-1">
+        {/* Team 1 Row */}
+        <div className={`flex items-center justify-between p-2 rounded-lg border-2 transition-colors
+            ${isP1Winner 
+                ? 'border-green-500 bg-green-50' 
+                : 'border-gray-100 bg-white focus-within:border-indigo-300'}`}>
+            <div className="flex-1 pr-2">
+                 <div className={`text-xs font-bold leading-tight ${isP1Winner ? 'text-green-900' : 'text-slate-700'}`} title={getLabel(match.pair1Id, match.pair1Name)}>
+                    {getLabel(match.pair1Id, match.pair1Name)}
+                </div>
+                {isP1Winner && <div className="text-[10px] text-green-600 font-medium flex items-center mt-0.5"><Trophy size={10} className="mr-1"/> Winner</div>}
             </div>
             <input 
-            type="number" className="w-10 h-8 text-center border rounded flex-shrink-0 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-            value={s1} onChange={e => setS1(e.target.value)} 
+                type="number" 
+                className={`w-12 h-10 text-center text-lg font-bold border-2 rounded-md outline-none transition-all
+                ${isP1Winner ? 'border-green-400 bg-white text-green-700' : 'border-gray-200 text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`}
+                value={s1} onChange={e => setS1(e.target.value)} 
+                placeholder="-"
             />
         </div>
         
-        <div className="flex justify-between items-center gap-2">
-            <div className="text-xs font-medium text-slate-800 leading-tight flex-1" title={getLabel(match.pair2Id, match.pair2Name)}>
-                {getLabel(match.pair2Id, match.pair2Name)}
+        {/* Team 2 Row */}
+        <div className={`flex items-center justify-between p-2 rounded-lg border-2 transition-colors
+            ${isP2Winner 
+                ? 'border-green-500 bg-green-50' 
+                : 'border-gray-100 bg-white focus-within:border-indigo-300'}`}>
+            <div className="flex-1 pr-2">
+                <div className={`text-xs font-bold leading-tight ${isP2Winner ? 'text-green-900' : 'text-slate-700'}`} title={getLabel(match.pair2Id, match.pair2Name)}>
+                    {getLabel(match.pair2Id, match.pair2Name)}
+                </div>
+                 {isP2Winner && <div className="text-[10px] text-green-600 font-medium flex items-center mt-0.5"><Trophy size={10} className="mr-1"/> Winner</div>}
             </div>
             <input 
-            type="number" className="w-10 h-8 text-center border rounded flex-shrink-0 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-            value={s2} onChange={e => setS2(e.target.value)} 
+                type="number" 
+                className={`w-12 h-10 text-center text-lg font-bold border-2 rounded-md outline-none transition-all
+                ${isP2Winner ? 'border-green-400 bg-white text-green-700' : 'border-gray-200 text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'}`}
+                value={s2} onChange={e => setS2(e.target.value)} 
+                placeholder="-"
             />
         </div>
       </div>
 
-      {match.pair1Id !== 'TBD' && match.pair2Id !== 'TBD' && (
-         <button 
-            onClick={handleSave} 
-            className={`w-full text-xs py-1.5 rounded flex justify-center items-center mt-2 transition-colors
-                ${isCompleted ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-         >
-             {isCompleted ? <><Edit2 size={14} className="mr-1"/> {t('update', lang)}</> : <><Save size={14} className="mr-1"/> {t('save', lang)}</>}
-         </button>
+      {/* Action Footer */}
+      {(match.pair1Id !== 'TBD' && match.pair2Id !== 'TBD') && (
+        <div className="px-3 pb-3">
+             <button 
+                onClick={handleSave} 
+                className={`w-full py-2 rounded-lg font-medium text-xs flex justify-center items-center transition-all shadow-sm
+                    ${isCompleted 
+                        ? 'bg-white border border-green-600 text-green-700 hover:bg-green-50' 
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow'}`}
+            >
+                {isCompleted ? <><Edit2 size={14} className="mr-1.5"/> {t('update', lang)}</> : <><Save size={14} className="mr-1.5"/> {t('save', lang)}</>}
+            </button>
+        </div>
       )}
     </div>
   );
